@@ -8,7 +8,7 @@ const cron = require("node-cron");
 
 const ffmpegProcesses = [];
 
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 0 0 * *", async () => {
   // stop all ffmpeg processes
   await stopService();
   // set ffmpegProcesses to empty array
