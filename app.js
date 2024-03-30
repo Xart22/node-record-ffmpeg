@@ -4,50 +4,21 @@ const app = express();
 const port = 8081;
 const { getCctv, findCctv } = require("./database");
 const fs = require("fs");
+const cron = require("node-cron");
 
 const ffmpegProcesses = [];
 
+cron.schedule("* * * * *", async () => {
+  // stop all ffmpeg processes
+  await stopService();
+  // set ffmpegProcesses to empty array
+  ffmpegProcesses.length = 0;
+  // start all ffmpeg processes
+  await startService();
+});
+
 app.listen(port, async () => {
-  console.log(`Server is running on port ${port}`);
-  let data = await getCctv();
-  data.map((cctv) => {
-    const title = `title="${cctv.chanel_name}"`;
-    const date = new Date();
-    const day = date.getDate();
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
-    const time = Date.now();
-    const fileName = `recorded_${cctv.chanel_name}_${day}-${month}-${year}_${time}.mp4`;
-    ffmpegProcesses.push({
-      id: cctv.id,
-      process: spawn("cmd", [
-        "/c",
-        "C:\\ffmpeg\\bin\\ffmpeg.exe",
-        "-i",
-        cctv.rtsp_url,
-        "-reconnect",
-        "1",
-        "-metadata",
-        title,
-        "-r",
-        "15",
-        "-c:v",
-        "libx264",
-        "-b:v",
-        "500k",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "40",
-        "-an",
-        fileName,
-      ]),
-      chanel_name: cctv.chanel_name,
-    });
-  });
-  ffmpegProcesses.map((cctv) => {
-    console.log("Process started for cctv id: ", cctv.chanel_name);
-  });
+  await startService();
 });
 
 app.get("/stop/:id", (req, res) => {
@@ -139,3 +110,55 @@ app.get("/start/:id", async (req, res) => {
     }
   }
 });
+
+const startService = async () => {
+  console.log("Starting service");
+  console.log("Count processes: ", ffmpegProcesses.length);
+  console.log(`Server is running on port ${port}`);
+  let data = await getCctv();
+  data.map((cctv) => {
+    const title = `title="${cctv.chanel_name}"`;
+    const date = new Date();
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    const time = Date.now();
+    const fileName = `recorded_${cctv.chanel_name}_${day}-${month}-${year}_${time}.mp4`;
+    ffmpegProcesses.push({
+      id: cctv.id,
+      process: spawn("cmd", [
+        "/c",
+        "C:\\ffmpeg\\bin\\ffmpeg.exe",
+        "-i",
+        cctv.rtsp_url,
+        "-reconnect",
+        "1",
+        "-metadata",
+        title,
+        "-r",
+        "15",
+        "-c:v",
+        "libx264",
+        "-b:v",
+        "500k",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "40",
+        "-an",
+        fileName,
+      ]),
+      chanel_name: cctv.chanel_name,
+    });
+  });
+  ffmpegProcesses.map((cctv) => {
+    console.log("Process started for cctv id: ", cctv.chanel_name);
+  });
+};
+
+const stopService = async () => {
+  ffmpegProcesses.map((cctv) => {
+    cctv.process.stdin.write("q");
+    console.log("Process stopped for cctv id: ", cctv.chanel_name);
+  });
+};
